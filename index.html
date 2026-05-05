@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Consultorio Dr. Berrio</title>
+
+<style>
+body { font-family: Arial; background:#eef2f7; margin:0; }
+.header { background:white; padding:10px; display:flex; align-items:center; gap:10px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+.container { padding:20px; }
+.login { max-width:320px; margin:100px auto; background:white; padding:20px; border-radius:12px; }
+input, textarea { width:100%; margin:5px 0; padding:8px; border-radius:6px; border:1px solid #ccc; }
+button { padding:10px; margin-top:10px; cursor:pointer; border:none; border-radius:6px; background:#2c7be5; color:white; }
+.hidden { display:none; }
+.card { background:white; padding:10px; margin:5px 0; border-radius:8px; cursor:pointer; }
+</style>
+</head>
+
+<body>
+
+<div id="login" class="login">
+<h2>Ingreso</h2>
+<input id="user" placeholder="Usuario">
+<input id="pass" type="password" placeholder="Contraseña">
+<button onclick="login()">Entrar</button>
+</div>
+
+<div id="app" class="hidden">
+<div class="header">
+<h3>Consultorio Dr. Berrio</h3>
+</div>
+
+<div class="container">
+<h2>Pacientes</h2>
+<button onclick="nuevoPaciente()">Nuevo Paciente</button>
+<div id="listaPacientes"></div>
+
+<div id="historia" class="hidden">
+<h3>Historia Clínica</h3>
+
+<input id="nombre" placeholder="Nombre">
+<input id="edad" type="number" placeholder="Edad">
+<input id="peso" type="number" placeholder="Peso" oninput="calcular()">
+<input id="talla" type="number" placeholder="Talla" oninput="calcular()">
+<input id="imc" placeholder="IMC" readonly>
+
+<textarea id="antecedentes" placeholder="Antecedentes"></textarea>
+<textarea id="examen" placeholder="Examen"></textarea>
+<textarea id="plan" placeholder="Plan"></textarea>
+
+<textarea id="formula" placeholder="Fórmula médica"></textarea>
+<button onclick="imprimirReceta()">📄 Receta Médica</button>
+
+<textarea id="laboratorios" placeholder="Orden de laboratorios"></textarea>
+<button onclick="imprimirLaboratorios()">🧪 Orden Laboratorios</button>
+
+<h4>Evoluciones</h4>
+<textarea id="nuevaEvolucion"></textarea>
+<button onclick="agregarEvolucion()">Agregar evolución</button>
+<div id="listaEvoluciones"></div>
+
+<button onclick="guardar()">Guardar</button>
+<button onclick="eliminarPaciente()">🗑 Eliminar Historia</button>
+<button onclick="volver()">⬅ Volver</button>
+
+</div>
+</div>
+</div>
+
+<script>
+
+let pacientes = JSON.parse(localStorage.getItem('pacientes')) || [];
+let actual = null;
+
+function login(){
+ if(document.getElementById('user').value==='FBERRIO' && 
+    document.getElementById('pass').value==='1038126873'){
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  render();
+ } else {
+  alert('Credenciales incorrectas');
+ }
+}
+
+function nuevoPaciente(){
+ historia.classList.remove('hidden');
+ actual=null;
+ limpiar();
+}
+
+function guardar(){
+ let data={
+  nombre:nombre.value,
+  edad:edad.value,
+  peso:peso.value,
+  talla:talla.value,
+  antecedentes:antecedentes.value,
+  examen:examen.value,
+  plan:plan.value,
+  formula:formula.value,
+  laboratorios:laboratorios.value,
+  evoluciones: actual!==null ? (pacientes[actual].evoluciones || []) : []
+ };
+
+ if(actual===null) pacientes.push(data);
+ else pacientes[actual]=data;
+
+ localStorage.setItem('pacientes', JSON.stringify(pacientes));
+ render();
+}
+
+function render(){
+ listaPacientes.innerHTML='';
+ pacientes.forEach((p,i)=>{
+  let d=document.createElement('div');
+  d.className='card';
+  d.innerText=p.nombre;
+  d.onclick=()=>abrir(i);
+  listaPacientes.appendChild(d);
+ });
+}
+
+function abrir(i){
+ actual=i;
+ let p=pacientes[i];
+ historia.classList.remove('hidden');
+
+ nombre.value=p.nombre;
+ edad.value=p.edad;
+ peso.value=p.peso;
+ talla.value=p.talla;
+ antecedentes.value=p.antecedentes;
+ examen.value=p.examen;
+ plan.value=p.plan;
+ formula.value=p.formula;
+ laboratorios.value=p.laboratorios || '';
+
+ mostrarEvoluciones();
+ calcular();
+}
+
+function calcular(){
+ let w=peso.value, h=talla.value/100;
+ if(w && h){
+  imc.value=(w/(h*h)).toFixed(2);
+ }
+}
+
+function limpiar(){
+ document.querySelectorAll('input,textarea').forEach(e=>e.value='');
+}
+
+function volver(){
+ historia.classList.add('hidden');
+ limpiar();
+ actual=null;
+}
+
+function eliminarPaciente(){
+ if(actual===null) return;
+ if(confirm("Eliminar paciente?")){
+  pacientes.splice(actual,1);
+  localStorage.setItem('pacientes', JSON.stringify(pacientes));
+  volver();
+  render();
+ }
+}
+
+function agregarEvolucion(){
+ if(actual===null) return alert("Guarde primero");
+
+ if(!pacientes[actual].evoluciones){
+  pacientes[actual].evoluciones=[];
+ }
+
+ let txt=nuevaEvolucion.value;
+ if(!txt) return;
+
+ pacientes[actual].evoluciones.push({
+  fecha:new Date().toLocaleString(),
+  texto:txt
+ });
+
+ localStorage.setItem('pacientes', JSON.stringify(pacientes));
+ nuevaEvolucion.value='';
+ mostrarEvoluciones();
+}
+
+function mostrarEvoluciones(){
+ listaEvoluciones.innerHTML='';
+ let ev=pacientes[actual].evoluciones || [];
+
+ ev.forEach((e,i)=>{
+  let d=document.createElement('div');
+  d.className='card';
+  d.innerHTML=`<b>${e.fecha}</b><br>${e.texto}
+  <br><button onclick="eliminarEvolucion(${i})">Eliminar</button>`;
+  listaEvoluciones.appendChild(d);
+ });
+}
+
+function eliminarEvolucion(i){
+ pacientes[actual].evoluciones.splice(i,1);
+ localStorage.setItem('pacientes', JSON.stringify(pacientes));
+ mostrarEvoluciones();
+}
+
+function imprimirReceta(){
+ let p=pacientes[actual];
+ let fecha=new Date().toLocaleDateString();
+
+ let win=window.open('');
+ win.document.write(`
+ <html>
+ <body style="font-family:Arial;padding:40px">
+
+ <div style="display:flex;justify-content:space-between;">
+   <img src="logo.jpg" style="height:80px">
+   <div><h2>Dr. Berrio</h2></div>
+ </div>
+
+ <hr>
+
+ <b>Paciente:</b> ${p.nombre}<br>
+ <b>Edad:</b> ${p.edad}<br>
+ <b>Fecha:</b> ${fecha}
+
+ <h3>Receta</h3>
+ <div style="border:1px solid #000;padding:15px;">
+ ${p.formula.replace(/\\n/g,"<br>")}
+ </div>
+
+ <br><br>
+ <div style="text-align:center;">
+   <img src="firma.png" style="height:80px"><br>
+   _______________________
+ </div>
+
+ <button onclick="window.print()">Imprimir / PDF</button>
+
+ </body></html>
+ `);
+}
+
+function imprimirLaboratorios(){
+ let p=pacientes[actual];
+ let fecha=new Date().toLocaleDateString();
+
+ let win=window.open('');
+ win.document.write(`
+ <html>
+ <body style="font-family:Arial;padding:40px">
+
+ <div style="display:flex;justify-content:space-between;">
+   <img src="logo.jpg" style="height:80px">
+   <div><h2>Dr. Berrio</h2></div>
+ </div>
+
+ <hr>
+
+ <h3>ORDEN DE LABORATORIOS</h3>
+
+ <b>Paciente:</b> ${p.nombre}<br>
+ <b>Edad:</b> ${p.edad}<br>
+ <b>Fecha:</b> ${fecha}
+
+ <div style="border:1px solid #000;padding:15px;">
+ ${ (p.laboratorios || '').replace(/\\n/g,"<br>") }
+ </div>
+
+ <br><br>
+ <div style="text-align:center;">
+   <img src="firma.png" style="height:80px"><br>
+   _______________________
+ </div>
+
+ <button onclick="window.print()">Imprimir / PDF</button>
+
+ </body></html>
+ `);
+}
+
+</script>
+
+</body>
+</html>
